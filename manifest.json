@@ -1,0 +1,37 @@
+{
+    "manifest_version": 3,
+    "name": "Copy To-Do List",
+    "version": "1.2",
+    "description": "自动记录复制内容并生成侧边栏待办清单",
+    "permissions": [
+        "storage",
+        "sidePanel"
+    ],
+    "action": {
+        "default_title": "点击打开侧边栏"
+    },
+    "side_panel": {
+        "default_path": "popup.html"
+    },
+    "background": {
+        "service_worker": "background.js"
+    },
+    "commands": {
+        "_execute_action": {
+            "suggested_key": {
+                "default": "Shift+Alt+Z",
+                "mac": "Shift+Alt+Z"
+            }
+        }
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "<all_urls>"
+            ],
+            "js": [
+                "content.js"
+            ]
+        }
+    ]
+}
