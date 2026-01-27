@@ -93,6 +93,41 @@
       line-height: 1.5;
       word-break: break-all; 
     }
+    .task-text p { margin: 0 0 6px 0; }
+    .task-text p:last-child { margin-bottom: 0; }
+    .task-text ul,
+    .task-text ol { margin: 4px 0 4px 18px; padding: 0; }
+    .task-text li { margin: 2px 0; }
+    .task-text pre {
+      background: #f1f5f9;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 8px;
+      overflow-x: auto;
+    }
+    .task-text code {
+      background: #f1f5f9;
+      border-radius: 4px;
+      padding: 1px 4px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+    }
+    .task-text blockquote {
+      border-left: 3px solid var(--border);
+      margin: 4px 0;
+      padding: 4px 8px;
+      color: var(--text-light);
+      background: #f8fafc;
+    }
+    .task-text a { color: var(--primary); text-decoration: underline; }
+    .task-text h1 { font-size: 16px; margin: 4px 0; }
+    .task-text h2 { font-size: 15px; margin: 4px 0; }
+    .task-text h3 { font-size: 14px; margin: 4px 0; }
+    .task-text h4,
+    .task-text h5,
+    .task-text h6 { font-size: 13px; margin: 4px 0; }
+    .task-text hr { border: none; border-top: 1px solid var(--border); margin: 6px 0; }
+    .task-text img { max-width: 100%; border-radius: 4px; }
     .task-info {
       margin-top: 8px;
       padding-top: 8px;

@@ -31,6 +31,174 @@ function copyTextToClipboard(text) {
     });
 }
 
+function escapeHtml(text) {
+    return text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function sanitizeUrl(url) {
+    const trimmed = url.trim();
+    if (!trimmed) return '';
+    const lower = trimmed.toLowerCase();
+    if (lower.startsWith('http://') || lower.startsWith('https://') || lower.startsWith('mailto:')) {
+        return trimmed;
+    }
+    return '';
+}
+
+function parseInline(text) {
+    if (!text) return '';
+    const codeTokens = [];
+    let output = escapeHtml(text).replace(/`([^`\n]+)`/g, (match, code) => {
+        const key = `__CODE_${codeTokens.length}__`;
+        codeTokens.push(`<code>${code}</code>`);
+        return key;
+    });
+
+    output = output.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, url) => {
+        const safeUrl = sanitizeUrl(url);
+        if (!safeUrl) return alt;
+        return `<img alt="${alt}" src="${safeUrl}">`;
+    });
+
+    output = output.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, label, url) => {
+        const safeUrl = sanitizeUrl(url);
+        if (!safeUrl) return label;
+        return `<a href="${safeUrl}" target="_blank" rel="noopener noreferrer">${label}</a>`;
+    });
+
+    output = output.replace(/\*\*([\s\S]+?)\*\*/g, '<strong>$1</strong>');
+    output = output.replace(/__([\s\S]+?)__/g, '<strong>$1</strong>');
+    output = output.replace(/~~([\s\S]+?)~~/g, '<del>$1</del>');
+    output = output.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+    output = output.replace(/_([^_\n]+)_/g, '<em>$1</em>');
+
+    codeTokens.forEach((token, index) => {
+        output = output.replace(`__CODE_${index}__`, token);
+    });
+
+    return output;
+}
+
+function renderMarkdown(text) {
+    if (!text) return '';
+    const lines = text.replace(/\r\n?/g, '\n').split('\n');
+    const result = [];
+    let inCode = false;
+    let codeLines = [];
+    let inUl = false;
+    let inOl = false;
+    let paragraph = [];
+
+    const closeLists = () => {
+        if (inUl) {
+            result.push('</ul>');
+            inUl = false;
+        }
+        if (inOl) {
+            result.push('</ol>');
+            inOl = false;
+        }
+    };
+
+    const flushParagraph = () => {
+        if (paragraph.length) {
+            result.push(`<p>${paragraph.join('<br>')}</p>`);
+            paragraph = [];
+        }
+    };
+
+    lines.forEach((line) => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('```')) {
+            if (inCode) {
+                result.push(`<pre><code>${codeLines.map(escapeHtml).join('\n')}</code></pre>`);
+                inCode = false;
+                codeLines = [];
+            } else {
+                flushParagraph();
+                closeLists();
+                inCode = true;
+            }
+            return;
+        }
+
+        if (inCode) {
+            codeLines.push(line);
+            return;
+        }
+
+        if (!trimmed) {
+            flushParagraph();
+            closeLists();
+            return;
+        }
+
+        const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/);
+        if (headingMatch) {
+            flushParagraph();
+            closeLists();
+            const level = headingMatch[1].length;
+            result.push(`<h${level}>${parseInline(headingMatch[2])}</h${level}>`);
+            return;
+        }
+
+        if (/^(\*{3,}|-{3,}|_{3,})$/.test(trimmed)) {
+            flushParagraph();
+            closeLists();
+            result.push('<hr>');
+            return;
+        }
+
+        const quoteMatch = trimmed.match(/^>\s+(.*)$/);
+        if (quoteMatch) {
+            flushParagraph();
+            closeLists();
+            result.push(`<blockquote>${parseInline(quoteMatch[1])}</blockquote>`);
+            return;
+        }
+
+        const orderedMatch = trimmed.match(/^(\d+)\.\s+(.*)$/);
+        if (orderedMatch) {
+            flushParagraph();
+            if (!inOl) {
+                closeLists();
+                result.push('<ol>');
+                inOl = true;
+            }
+            result.push(`<li>${parseInline(orderedMatch[2])}</li>`);
+            return;
+        }
+
+        const unorderedMatch = trimmed.match(/^[-+*]\s+(.*)$/);
+        if (unorderedMatch) {
+            flushParagraph();
+            if (!inUl) {
+                closeLists();
+                result.push('<ul>');
+                inUl = true;
+            }
+            result.push(`<li>${parseInline(unorderedMatch[1])}</li>`);
+            return;
+        }
+
+        closeLists();
+        paragraph.push(parseInline(trimmed));
+    });
+
+    if (inCode) {
+        result.push(`<pre><code>${codeLines.map(escapeHtml).join('\n')}</code></pre>`);
+    }
+
+    flushParagraph();
+    closeLists();
+    return result.join('');
+}
+
 /**
  * @param {Array} tasks
  */
@@ -87,9 +255,10 @@ function renderTasks(tasks) {
             checkbox.onchange = () => toggleTask(task.id);
 
             // 2. 双击编辑逻辑
-            const textSpan = document.createElement('span');
+            const textSpan = document.createElement('div');
             textSpan.className = 'task-text';
-            textSpan.textContent = task.text;
+            textSpan.dataset.raw = task.text;
+            textSpan.innerHTML = renderMarkdown(task.text);
             textSpan.ondblclick = () => enterEditMode(task.id, textSpan, item);
 
             const copyBtn = document.createElement('button');
@@ -136,7 +305,7 @@ function renderTasks(tasks) {
  * 进入编辑模式
  */
 function enterEditMode(id, textSpan, item) {
-    const currentText = textSpan.textContent;
+    const currentText = textSpan.dataset.raw || textSpan.textContent;
     const input = document.createElement('textarea');
     input.className = 'edit-input';
     input.value = currentText;
