@@ -6,6 +6,31 @@ const searchInput = document.getElementById('searchInput');
 let allTasks = [];
 let dragSrcEl = null;
 
+function copyTextToClipboard(text) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        return navigator.clipboard.writeText(text);
+    }
+    return new Promise((resolve, reject) => {
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.top = '-9999px';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        try {
+            const ok = document.execCommand('copy');
+            document.body.removeChild(textarea);
+            if (ok) resolve();
+            else reject(new Error('copy failed'));
+        } catch (err) {
+            document.body.removeChild(textarea);
+            reject(err);
+        }
+    });
+}
+
 /**
  * @param {Array} tasks
  */
@@ -67,8 +92,19 @@ function renderTasks(tasks) {
             textSpan.textContent = task.text;
             textSpan.ondblclick = () => enterEditMode(task.id, textSpan, item);
 
+            const copyBtn = document.createElement('button');
+            copyBtn.type = 'button';
+            copyBtn.className = 'copy-btn';
+            copyBtn.textContent = 'Copy';
+            copyBtn.onmousedown = (e) => e.stopPropagation();
+            copyBtn.onclick = (e) => {
+                e.stopPropagation();
+                copyTextToClipboard(task.text);
+            };
+
             main.appendChild(checkbox);
             main.appendChild(textSpan);
+            main.appendChild(copyBtn);
             item.appendChild(deleteBtn);
             item.appendChild(main);
 
