@@ -29,7 +29,14 @@ function CardRotate({ children, onSendToBack, sensitivity, disableDrag = false }
 
     return e(motion.div, {
         className: "card-rotate",
-        style: { x, y, rotateX, rotateY, position: 'absolute', width: '100%', height: '100%' },
+        style: { 
+            x, y, rotateX, rotateY, 
+            position: 'absolute', 
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+        },
         drag: true,
         dragConstraints: { top: 0, right: 0, bottom: 0, left: 0 },
         dragElastic: 0.6,
@@ -91,7 +98,7 @@ function Stack({ images, sensitivity = 200, animationConfig = { stiffness: 260, 
                     animate: {
                         rotateZ: (stack.length - index - 1) * 4,
                         scale: 1 + index * 0.06 - stack.length * 0.06,
-                        transformOrigin: '90% 90%'
+                        transformOrigin: 'center center'
                     },
                     initial: false,
                     transition: {
@@ -104,16 +111,13 @@ function Stack({ images, sensitivity = 200, animationConfig = { stiffness: 260, 
                         maxHeight: '540px',
                         width: 'auto',
                         height: 'auto',
-                        position: 'absolute',
-                        left: '50%',
-                        top: '50%',
-                        transform: 'translate(-50%, -50%)',
                         borderRadius: '1.5rem',
                         overflow: 'hidden',
                         background: 'white',
                         boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
                         border: '6px solid white',
-                        cursor: 'pointer'
+                        cursor: 'pointer',
+                        position: 'relative'
                     }
                 }, [
                     e('img', { 

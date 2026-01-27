@@ -138,12 +138,19 @@ function renderMarkdown(text) {
             return;
         }
 
-        const headingMatch = trimmed.match(/^(#{1,6})\s+(.*)$/);
+        const headingMatch = trimmed.match(/^(.*?)(#{1,6})\s+(.*)$/);
         if (headingMatch) {
-            flushParagraph();
+            const preText = headingMatch[1].trim();
+            const level = headingMatch[2].length;
+            const titleText = headingMatch[3];
+
+            if (preText) {
+                paragraph.push(parseInline(preText));
+                flushParagraph();
+            }
+
             closeLists();
-            const level = headingMatch[1].length;
-            result.push(`<h${level}>${parseInline(headingMatch[2])}</h${level}>`);
+            result.push(`<h${level}>${parseInline(titleText)}</h${level}>`);
             return;
         }
 
