@@ -201,6 +201,39 @@
       cursor: pointer;
       accent-color: var(--primary);
     }
+
+    /* 图片上传区样式 */
+    #imageSection { 
+      margin-top: 20px; 
+      border-top: 1px solid var(--border); 
+      padding-top: 16px; 
+    }
+    #dropZone {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      text-align: center;
+      color: var(--text-light);
+      cursor: pointer;
+      font-size: 13px;
+      transition: all 0.2s;
+    }
+    #dropZone:hover, #dropZone.dragover { 
+      border-color: var(--primary); 
+      background: #eff6ff; 
+      color: var(--primary);
+    }
+    .stack-container { 
+      position: relative; 
+      width: 100%; 
+      height: 100%; 
+      perspective: 1000px; 
+    }
+    .card { 
+      background: white; 
+      box-shadow: 0 4px 15px rgba(0,0,0,0.15); 
+      border: 4px solid white;
+    }
   </style>
 </head>
 <body>
@@ -211,10 +244,25 @@
     </div>
   </div>
   <div id="taskList"></div>
+  
+  <div id="imageSection">
+    <div id="dropZone">
+      <span>拖拽、粘贴或点击上传图片</span>
+      <input type="file" id="fileInput" hidden accept="image/*">
+    </div>
+    <div id="react-stack-root" style="height: 600px; position: relative; margin-top: 10px; overflow: hidden;"></div>
+  </div>
+
   <div class="actions">
     <button id="exportMd">导出 Markdown</button>
     <button id="clearAll">清空全部</button>
   </div>
+  <script src="vendor/react.production.min.js"></script>
+  <script src="vendor/react-dom.production.min.js"></script>
+  <script src="vendor/framer-motion.js"></script>
+  <script src="image-store.js"></script>
+  <script src="image-utils.js"></script>
+  <script src="stack-component.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

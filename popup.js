@@ -436,3 +436,63 @@ chrome.storage.local.get({ tasks: [] }, (result) => {
     allTasks = result.tasks;
     renderTasks(allTasks);
 });
+
+// --- 图片上传与 Stack 初始化 ---
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+async function loadImages() {
+    try {
+        const images = await getAllImages();
+        if (typeof window.renderStack === 'function') {
+            window.renderStack(images, async (id) => {
+                await deleteImage(id);
+                loadImages();
+            });
+        }
+    } catch (err) {
+        console.error('加载图片失败:', err);
+    }
+}
+
+// 延迟一下确保脚本加载完成
+setTimeout(loadImages, 200);
+
+async function handleUpload(files) {
+    for (const file of files) {
+        if (file.type.startsWith('image/')) {
+            const compressed = await compressImage(file);
+            await saveImage(compressed);
+        }
+    }
+    loadImages();
+}
+
+if (dropZone) {
+    dropZone.onclick = () => fileInput.click();
+    fileInput.onchange = (e) => handleUpload(e.target.files);
+
+    dropZone.ondragover = (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    };
+    dropZone.ondragleave = () => dropZone.classList.remove('dragover');
+    dropZone.ondrop = (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        handleUpload(e.dataTransfer.files);
+    };
+}
+
+document.addEventListener('paste', (e) => {
+    const items = e.clipboardData.items;
+    const files = [];
+    for (const item of items) {
+        if (item.type.indexOf('image') !== -1) {
+            files.push(item.getAsFile());
+        }
+    }
+    if (files.length > 0) {
+        handleUpload(files);
+    }
+});
