@@ -2,6 +2,7 @@ const taskList = document.getElementById('taskList');
 const exportBtn = document.getElementById('exportMd');
 const collectBtn = document.getElementById('collectChecked');
 const viewStashedBtn = document.getElementById('viewStashed');
+const exportAiBtn = document.getElementById('exportAiMd');
 const clearBtn = document.getElementById('clearAll');
 const searchInput = document.getElementById('searchInput');
 
@@ -10,6 +11,14 @@ const stashedList = document.getElementById('stashedList');
 const closeStashed = document.getElementById('closeStashed');
 const closeStashedBtn = document.getElementById('closeStashedBtn');
 const clearStashedBtn = document.getElementById('clearStashed');
+
+const settingsModal = document.getElementById('settingsModal');
+const openSettingsBtn = document.getElementById('openSettings');
+const closeSettingsBtn = document.getElementById('closeSettings');
+const saveSettingsBtn = document.getElementById('saveSettings');
+const apiKeyInput = document.getElementById('apiKeyInput');
+const apiBaseInput = document.getElementById('apiBaseInput');
+const loadingOverlay = document.getElementById('loadingOverlay');
 
 let allTasks = [];
 let dragSrcEl = null;
@@ -419,6 +428,108 @@ function deleteTask(id) {
 }
 
 searchInput.oninput = () => renderTasks(allTasks);
+
+// --- AI 设置逻辑 ---
+openSettingsBtn.onclick = () => {
+    chrome.storage.local.get(['aiApiKey', 'apiBaseUrl'], (result) => {
+        apiKeyInput.value = result.aiApiKey || '';
+        apiBaseInput.value = result.apiBaseUrl || 'https://api.deepseek.com/v1';
+        settingsModal.style.display = 'flex';
+    });
+};
+
+closeSettingsBtn.onclick = () => settingsModal.style.display = 'none';
+
+saveSettingsBtn.onclick = () => {
+    const apiKey = apiKeyInput.value.trim();
+    const apiBase = apiBaseInput.value.trim() || 'https://api.deepseek.com/v1';
+    
+    chrome.storage.local.set({ 
+        aiApiKey: apiKey, 
+        apiBaseUrl: apiBase 
+    }, () => {
+        showCustomAlert('设置已保存');
+        settingsModal.style.display = 'none';
+    });
+};
+
+async function callDeepSeek(text) {
+    const result = await new Promise(r => chrome.storage.local.get(['aiApiKey', 'apiBaseUrl'], r));
+    if (!result.aiApiKey) {
+        throw new Error('请先在设置中配置 API Key');
+    }
+
+    const prompt = `你需要对我传入的Markdown格式文本进行优化处理，核心要求如下：
+ 
+1. 完全保留文本中的所有核心信息、关键数据、原始意图，不增删、不修改原意；
+
+2. 精准剔除文本中的口语化语气词、赘余助词（如呢、啊、吧、啦、其实、就是说、呃等），简化口语化表述，使语句更简洁正式；
+
+3. 梳理内容逻辑，对零散表述做自然衔接，保持原有列表/段落结构不变，Markdown格式规范统一；
+
+4. 仅做表述优化与格式规整，不额外归纳总结、不调整内容顺序、不添加任何无关内容；
+
+5. 输出结果仍为标准Markdown格式，与输入的基础结构（标题、列表、换行等）保持一致`;
+
+    const response = await fetch(`${result.apiBaseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${result.aiApiKey}`
+        },
+        body: JSON.stringify({
+            model: "deepseek-chat",
+            messages: [
+                { role: "system", content: prompt },
+                { role: "user", content: text }
+            ],
+            temperature: 0.3
+        })
+    });
+
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error?.message || 'AI 请求失败');
+    }
+
+    const data = await response.json();
+    return data.choices[0].message.content;
+}
+
+exportAiBtn.onclick = () => {
+    chrome.storage.local.get({ tasks: [], stashedTasks: [] }, async (result) => {
+        const allToExport = [...result.tasks];
+        const taskIds = new Set(allToExport.map(t => t.id));
+        result.stashedTasks.forEach(stashed => {
+            if (!taskIds.has(stashed.id)) allToExport.push(stashed);
+        });
+
+        if (allToExport.length === 0) {
+            showCustomAlert('当前没有任何可导出的内容');
+            return;
+        }
+
+        allToExport.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+        const rawContent = allToExport
+            .map(t => `- [${t.completed ? 'x' : ' '}] ${t.text}`)
+            .join('\n');
+
+        loadingOverlay.style.display = 'flex';
+        try {
+            const optimizedContent = await callDeepSeek(rawContent);
+            const blob = new Blob([optimizedContent], { type: 'text/markdown' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'optimized-todo-list.md';
+            a.click();
+        } catch (err) {
+            showCustomAlert(`优化失败: ${err.message}`);
+        } finally {
+            loadingOverlay.style.display = 'none';
+        }
+    });
+};
 
 exportBtn.onclick = () => {
     chrome.storage.local.get({ tasks: [], stashedTasks: [] }, (result) => {

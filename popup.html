@@ -181,11 +181,12 @@
       padding: 16px 0;
       margin-top: 20px; 
       display: flex; 
+      flex-wrap: wrap;
       gap: 8px; 
       border-top: 1px solid var(--border);
     }
     button { 
-      flex: 1;
+      flex: 1 1 calc(50% - 8px);
       cursor: pointer; 
       padding: 8px 12px; 
       border-radius: 6px;
@@ -194,7 +195,8 @@
       font-size: 13px;
       font-weight: 500;
     }
-    #exportMd { background: var(--primary); color: white; border: none; }
+    #exportMd { background: white; color: var(--text); border: 1px solid var(--border); }
+    #exportAiMd { background: var(--primary); color: white; border: none; }
     input[type="checkbox"] {
       width: 18px;
       height: 18px;
@@ -339,11 +341,71 @@
       display: flex;
       gap: 8px;
     }
+
+    /* AI 设置样式 */
+    .settings-btn {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      cursor: pointer;
+      color: var(--text-light);
+      font-size: 18px;
+      z-index: 20;
+    }
+    .settings-btn:hover { color: var(--primary); }
+    
+    .config-group {
+      margin-bottom: 16px;
+      text-align: left;
+    }
+    .config-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-light);
+      margin-bottom: 4px;
+    }
+    .config-group input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      box-sizing: border-box;
+      font-size: 13px;
+    }
+
+    /* 加载动画 */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(255, 255, 255, 0.8);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 3000;
+    }
+    .spinner {
+      width: 30px;
+      height: 30px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid var(--primary);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 10px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
   <div class="header">
     <h3>复制记录清单</h3>
+    <div id="openSettings" class="settings-btn" title="AI 设置">⚙</div>
     <div class="search-container">
       <input type="text" id="searchInput" placeholder="搜索记录...">
     </div>
@@ -384,10 +446,36 @@
     </div>
   </div>
 
+  <!-- AI 设置弹窗 -->
+  <div id="settingsModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content" style="width: 300px;">
+      <h4>AI 优化设置</h4>
+      <div class="config-group">
+        <label>DeepSeek API Key</label>
+        <input type="password" id="apiKeyInput" placeholder="sk-...">
+      </div>
+      <div class="config-group">
+        <label>API Base URL (可选)</label>
+        <input type="text" id="apiBaseInput" placeholder="https://api.deepseek.com/v1">
+      </div>
+      <div class="modal-actions">
+        <button id="closeSettings">取消</button>
+        <button id="saveSettings" style="background: var(--primary); color: white; border: none;">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI 处理加载层 -->
+  <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+    <div class="spinner"></div>
+    <div style="font-size: 13px; color: var(--text-light);">AI 正在优化内容...</div>
+  </div>
+
   <div class="actions">
     <button id="collectChecked">收集勾选项</button>
     <button id="viewStashed">查看暂存</button>
-    <button id="exportMd">导出 Markdown</button>
+    <button id="exportMd">普通导出</button>
+    <button id="exportAiMd">AI 优化导出</button>
     <button id="clearAll">清空全部</button>
   </div>
   <script src="vendor/react.production.min.js"></script>
