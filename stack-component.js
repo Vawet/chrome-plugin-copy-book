@@ -135,9 +135,11 @@ function Stack({ images, sensitivity = 200, animationConfig = { stiffness: 260, 
                         key: 'del',
                         className: 'img-delete-btn',
                         title: '删除图片',
-                        onClick: (ev) => {
+                        onClick: async (ev) => {
                             ev.stopPropagation();
-                            if (confirm('确定删除这张图片吗？')) {
+                            if (window.showCustomConfirm && await window.showCustomConfirm('确定删除这张图片吗？')) {
+                                onDelete(card.id);
+                            } else if (!window.showCustomConfirm && confirm('确定删除这张图片吗？')) {
                                 onDelete(card.id);
                             }
                         },

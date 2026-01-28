@@ -1,7 +1,15 @@
 const taskList = document.getElementById('taskList');
 const exportBtn = document.getElementById('exportMd');
+const collectBtn = document.getElementById('collectChecked');
+const viewStashedBtn = document.getElementById('viewStashed');
 const clearBtn = document.getElementById('clearAll');
 const searchInput = document.getElementById('searchInput');
+
+const stashedModal = document.getElementById('stashedModal');
+const stashedList = document.getElementById('stashedList');
+const closeStashed = document.getElementById('closeStashed');
+const closeStashedBtn = document.getElementById('closeStashedBtn');
+const clearStashedBtn = document.getElementById('clearStashed');
 
 let allTasks = [];
 let dragSrcEl = null;
@@ -413,8 +421,21 @@ function deleteTask(id) {
 searchInput.oninput = () => renderTasks(allTasks);
 
 exportBtn.onclick = () => {
-    chrome.storage.local.get({ tasks: [] }, (result) => {
-        const content = result.tasks
+    chrome.storage.local.get({ tasks: [], stashedTasks: [] }, (result) => {
+        // 合并当前任务和暂存任务，通过 ID 去重
+        const allToExport = [...result.tasks];
+        const taskIds = new Set(allToExport.map(t => t.id));
+        
+        result.stashedTasks.forEach(stashed => {
+            if (!taskIds.has(stashed.id)) {
+                allToExport.push(stashed);
+            }
+        });
+
+        // 按时间戳排序（可选，保持文档整洁）
+        allToExport.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+        const content = allToExport
             .map(t => `- [${t.completed ? 'x' : ' '}] ${t.text} (来源: [${t.sourceTitle}](${t.sourceUrl}) | 时间: ${t.timestamp})`)
             .join('\n');
         const blob = new Blob([content], { type: 'text/markdown' });
@@ -426,8 +447,147 @@ exportBtn.onclick = () => {
     });
 };
 
-clearBtn.onclick = () => {
-    if (confirm('确定清空所有记录吗？')) {
+// --- 自定义弹窗逻辑 ---
+function showCustomAlert(message) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('customModal');
+        const msgEl = document.getElementById('modalMessage');
+        const confirmBtn = document.getElementById('modalConfirm');
+        const cancelBtn = document.getElementById('modalCancel');
+
+        msgEl.textContent = message;
+        cancelBtn.style.display = 'none';
+        modal.style.display = 'flex';
+
+        confirmBtn.onclick = () => {
+            modal.style.display = 'none';
+            resolve();
+        };
+    });
+}
+
+function showCustomConfirm(message) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('customModal');
+        const msgEl = document.getElementById('modalMessage');
+        const confirmBtn = document.getElementById('modalConfirm');
+        const cancelBtn = document.getElementById('modalCancel');
+
+        msgEl.textContent = message;
+        cancelBtn.style.display = 'block';
+        modal.style.display = 'flex';
+
+        confirmBtn.onclick = () => {
+            modal.style.display = 'none';
+            resolve(true);
+        };
+        cancelBtn.onclick = () => {
+            modal.style.display = 'none';
+            resolve(false);
+        };
+    });
+}
+
+// 暴露给其他脚本
+window.showCustomConfirm = showCustomConfirm;
+window.showCustomAlert = showCustomAlert;
+
+function renderStashedTasks() {
+    chrome.storage.local.get({ stashedTasks: [] }, (result) => {
+        stashedList.innerHTML = '';
+        if (result.stashedTasks.length === 0) {
+            stashedList.innerHTML = '<div style="text-align: center; color: var(--text-light); padding: 20px;">暂无内容</div>';
+            return;
+        }
+
+        result.stashedTasks.forEach(task => {
+            const item = document.createElement('div');
+            item.className = 'stashed-item';
+            
+            const text = document.createElement('div');
+            text.className = 'stashed-item-text';
+            text.textContent = task.text;
+
+            const info = document.createElement('div');
+            info.className = 'stashed-item-info';
+            info.textContent = `时间: ${task.timestamp}`;
+
+            const del = document.createElement('div');
+            del.className = 'stashed-item-del';
+            del.innerHTML = '&times;';
+            del.onclick = () => deleteStashedTask(task.id);
+
+            item.appendChild(text);
+            item.appendChild(info);
+            item.appendChild(del);
+            stashedList.appendChild(item);
+        });
+    });
+}
+
+async function deleteStashedTask(id) {
+    if (await showCustomConfirm('确定删除该暂存项吗？')) {
+        chrome.storage.local.get({ stashedTasks: [] }, (result) => {
+            const newStashed = result.stashedTasks.filter(t => t.id !== id);
+            chrome.storage.local.set({ stashedTasks: newStashed }, () => {
+                renderStashedTasks();
+            });
+        });
+    }
+}
+
+viewStashedBtn.onclick = () => {
+    renderStashedTasks();
+    stashedModal.style.display = 'flex';
+};
+
+closeStashed.onclick = closeStashedBtn.onclick = () => {
+    stashedModal.style.display = 'none';
+};
+
+clearStashedBtn.onclick = async () => {
+    if (await showCustomConfirm('确定清空所有暂存项吗？')) {
+        chrome.storage.local.set({ stashedTasks: [] }, () => {
+            renderStashedTasks();
+        });
+    }
+};
+
+collectBtn.onclick = () => {
+    const checkedTasks = allTasks.filter(t => t.completed);
+    if (checkedTasks.length === 0) {
+        showCustomAlert('当前没有已勾选的项');
+        return;
+    }
+
+    chrome.storage.local.get({ tasks: [], stashedTasks: [] }, (result) => {
+        const currentStashed = result.stashedTasks;
+        const stashedIds = new Set(currentStashed.map(t => t.id));
+        
+        const newStashed = [...currentStashed];
+        const checkedIds = new Set();
+
+        checkedTasks.forEach(task => {
+            checkedIds.add(task.id);
+            if (!stashedIds.has(task.id)) {
+                newStashed.push(task);
+            }
+        });
+
+        // 从当前任务中移除已收集的项
+        const remainingTasks = result.tasks.filter(t => !checkedIds.has(t.id));
+
+        chrome.storage.local.set({ 
+            stashedTasks: newStashed,
+            tasks: remainingTasks 
+        }, () => {
+            showCustomAlert(`已成功收集 ${checkedTasks.length} 个勾选项并移至暂存区`);
+        });
+    });
+};
+
+clearBtn.onclick = async () => {
+    if (await showCustomConfirm('确定清空所有记录吗？')) {
         chrome.storage.local.set({ tasks: [] });
     }
 };
